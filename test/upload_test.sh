@@ -41,3 +41,13 @@ kill "$server_pid" 2>/dev/null; wait "$server_pid" 2>/dev/null || true
 
 grep -q '500' /tmp/upload_test_err.log
 echo "PASS: 500 response fails the script with status in the error"
+
+# release-action=release must be rejected before any network call is made.
+if RELEASE_ACTION=release FILE_PATH="$tmpfile" RESOURCE_TYPE=driver \
+  API_BASE_URL="http://127.0.0.1:1" API_TOKEN=test-token RETRIES=1 GITHUB_OUTPUT="$out" \
+  scripts/upload.sh >/tmp/upload_test_err.log 2>&1; then
+  echo "FAIL: expected release-action=release to be rejected"
+  exit 1
+fi
+grep -q 'not permitted' /tmp/upload_test_err.log
+echo "PASS: release-action=release is rejected"

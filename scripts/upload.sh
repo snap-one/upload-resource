@@ -4,6 +4,12 @@ set -euo pipefail
 # Mask immediately so the token never appears in logs even on an unexpected failure path below.
 echo "::add-mask::${API_TOKEN}"
 
+# Immediate production release must go through the management UI, not an automated CI step.
+if [[ "${RELEASE_ACTION:-}" == "release" ]]; then
+  echo "::error::release-action: release is not permitted from this action — promote to production via the Resource Repository admin UI instead"
+  exit 1
+fi
+
 response_file=$(mktemp)
 args=(-sS -o "$response_file" -w '%{http_code}' \
   --retry "${RETRIES:-3}" --retry-connrefused --retry-all-errors \

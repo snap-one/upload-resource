@@ -18,7 +18,7 @@ inputs:
     description: 'Optional metadata as a JSON string'
     required: false
   release-action:
-    description: 'Optional release action: release, reject, feature_flag, or feature_flag_variation'
+    description: 'Optional release action: reject, feature_flag, or feature_flag_variation. "release" (immediate production release) is blocked — promote via the admin UI instead.'
     required: false
   flag:
     description: 'Feature flag name. Required when release-action is feature_flag or feature_flag_variation.'

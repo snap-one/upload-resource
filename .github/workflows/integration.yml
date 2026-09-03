@@ -1,0 +1,45 @@
+name: integration
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+
+# Never add `pull_request` here: this repo is public, and GitHub withholds
+# secrets from workflows triggered by a fork's pull_request. Real-API runs
+# only happen on main / manual dispatch.
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build a disposable test fixture
+        run: echo "upload-resource smoke test ${{ github.run_id }}" > smoke-test.bin
+
+      - name: Upload
+        id: upload
+        uses: ./
+        with:
+          file: smoke-test.bin
+          # TODO: point at a resourceType created specifically for CI smoke tests
+          # (see GET /api/v1/resource-types) — don't reuse `driver` or another
+          # production type, it'll pollute real search/processing pipelines.
+          resource-type: ${{ vars.RESOURCE_REPOSITORY_TEST_RESOURCE_TYPE }}
+          version: "0.0.0-ci.${{ github.run_id }}"
+          # TODO: point at stage, never prod.
+          api-base-url: ${{ vars.RESOURCE_REPOSITORY_STAGE_URL }}
+          # TODO: a CI/CD token scoped resources:write + resources:delete against stage.
+          api-token: ${{ secrets.RESOURCE_REPOSITORY_STAGE_TOKEN }}
+
+      - name: Verify outputs
+        run: |
+          test -n "${{ steps.upload.outputs.resource-id }}"
+          test -n "${{ steps.upload.outputs.resource-version }}"
+
+      - name: Clean up the uploaded resource
+        if: always() && steps.upload.outputs.resource-id != ''
+        run: |
+          curl -sS -f -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.RESOURCE_REPOSITORY_STAGE_TOKEN }}" \
+            "${{ vars.RESOURCE_REPOSITORY_STAGE_URL }}/api/v1/resources/${{ steps.upload.outputs.resource-id }}"

@@ -46,7 +46,7 @@ Gating a release behind a feature flag instead of the default beta (`ManualAppro
 | `resource-type` | yes | `resourceType` field |
 | `version` | no | Resource version |
 | `metadata` | no | Metadata as a JSON string |
-| `release-action` | no | `release`, `reject`, `feature_flag`, or `feature_flag_variation`. Omitted defaults to beta (`ManualApproval`). |
+| `release-action` | no | `reject`, `feature_flag`, or `feature_flag_variation`. Omitted defaults to beta (`ManualApproval`). **`release` (immediate production release) is rejected by this action** — promote via the admin UI instead. |
 | `flag` | no | Feature flag name — required when `release-action` is `feature_flag`/`feature_flag_variation` |
 | `provider` | no | Feature flag provider (e.g. `launchdarkly`, `split`) — required with the flag actions above |
 | `project` | no | Provider project identifier, scoping flag targeting rules |
