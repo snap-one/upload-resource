@@ -22,6 +22,22 @@ curl/auth/retry step.
 - run: echo "Uploaded ${{ steps.upload.outputs.resource-id }} v${{ steps.upload.outputs.resource-version }}"
 ```
 
+Gating a release behind a feature flag instead of the default beta (`ManualApproval`) state:
+
+```yaml
+- uses: snap-one/upload-resource@v1
+  with:
+    file: dist/mydriver.c4z
+    resource-type: driver
+    version: 2.0.0
+    release-action: feature_flag_variation
+    flag: enable-motion-sensor-v2
+    provider: split
+    project: home-automation
+    api-base-url: https://resources.snapone.com
+    api-token: ${{ secrets.RESOURCE_REPOSITORY_TOKEN }}
+```
+
 ## Inputs
 
 | Name | Required | Description |
@@ -30,6 +46,10 @@ curl/auth/retry step.
 | `resource-type` | yes | `resourceType` field |
 | `version` | no | Resource version |
 | `metadata` | no | Metadata as a JSON string |
+| `release-action` | no | `release`, `reject`, `feature_flag`, or `feature_flag_variation`. Omitted defaults to beta (`ManualApproval`). |
+| `flag` | no | Feature flag name — required when `release-action` is `feature_flag`/`feature_flag_variation` |
+| `provider` | no | Feature flag provider (e.g. `launchdarkly`, `split`) — required with the flag actions above |
+| `project` | no | Provider project identifier, scoping flag targeting rules |
 | `api-base-url` | yes | Base URL of the Resource Repository API |
 | `api-token` | yes | API token — pass via `secrets`, never hardcode |
 | `retries` | no | Retry attempts for transient network/5xx failures (default `3`) |

@@ -13,6 +13,10 @@ args=(-sS -o "$response_file" -w '%{http_code}' \
 
 [[ -n "${VERSION:-}" ]] && args+=(-F "version=${VERSION}")
 [[ -n "${METADATA:-}" ]] && args+=(-F "metadata=${METADATA}")
+[[ -n "${RELEASE_ACTION:-}" ]] && args+=(-F "releaseAction=${RELEASE_ACTION}")
+[[ -n "${FLAG:-}" ]] && args+=(-F "flag=${FLAG}")
+[[ -n "${PROVIDER:-}" ]] && args+=(-F "provider=${PROVIDER}")
+[[ -n "${PROJECT:-}" ]] && args+=(-F "project=${PROJECT}")
 
 set +e
 status=$(curl "${args[@]}" "${API_BASE_URL%/}/api/v1/resources")

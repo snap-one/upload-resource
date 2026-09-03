@@ -17,6 +17,18 @@ inputs:
   metadata:
     description: 'Optional metadata as a JSON string'
     required: false
+  release-action:
+    description: 'Optional release action: release, reject, feature_flag, or feature_flag_variation'
+    required: false
+  flag:
+    description: 'Feature flag name. Required when release-action is feature_flag or feature_flag_variation.'
+    required: false
+  provider:
+    description: 'Feature flag provider (e.g. launchdarkly, split). Required when release-action is feature_flag or feature_flag_variation.'
+    required: false
+  project:
+    description: 'Optional provider project identifier, scoping flag targeting rules'
+    required: false
   api-base-url:
     description: 'Base URL of the Resource Repository API'
     required: true
@@ -50,6 +62,10 @@ runs:
         RESOURCE_TYPE: ${{ inputs.resource-type }}
         VERSION: ${{ inputs.version }}
         METADATA: ${{ inputs.metadata }}
+        RELEASE_ACTION: ${{ inputs.release-action }}
+        FLAG: ${{ inputs.flag }}
+        PROVIDER: ${{ inputs.provider }}
+        PROJECT: ${{ inputs.project }}
         API_BASE_URL: ${{ inputs.api-base-url }}
         API_TOKEN: ${{ inputs.api-token }}
         RETRIES: ${{ inputs.retries }}
