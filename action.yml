@@ -1,0 +1,55 @@
+name: 'Upload Resource'
+description: 'Upload a build artifact to the Resource Repository (POST /api/v1/resources)'
+branding:
+  icon: 'upload-cloud'
+  color: 'blue'
+
+inputs:
+  file:
+    description: 'Path to the file to upload'
+    required: true
+  resource-type:
+    description: 'Resource type (resourceType field)'
+    required: true
+  version:
+    description: 'Optional resource version'
+    required: false
+  metadata:
+    description: 'Optional metadata as a JSON string'
+    required: false
+  api-base-url:
+    description: 'Base URL of the Resource Repository API'
+    required: true
+  api-token:
+    description: 'API token for authentication. Pass via secrets — never hardcode.'
+    required: true
+  retries:
+    description: 'Retry attempts for transient network/5xx failures'
+    required: false
+    default: '3'
+
+outputs:
+  resource-id:
+    description: 'ID of the created resource'
+    value: ${{ steps.upload.outputs.resource-id }}
+  resource-version:
+    description: 'Version of the created resource'
+    value: ${{ steps.upload.outputs.resource-version }}
+  response:
+    description: 'Full JSON response body from the API'
+    value: ${{ steps.upload.outputs.response }}
+
+runs:
+  using: composite
+  steps:
+    - id: upload
+      shell: bash
+      run: ${{ github.action_path }}/scripts/upload.sh
+      env:
+        FILE_PATH: ${{ inputs.file }}
+        RESOURCE_TYPE: ${{ inputs.resource-type }}
+        VERSION: ${{ inputs.version }}
+        METADATA: ${{ inputs.metadata }}
+        API_BASE_URL: ${{ inputs.api-base-url }}
+        API_TOKEN: ${{ inputs.api-token }}
+        RETRIES: ${{ inputs.retries }}

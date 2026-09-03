@@ -1,0 +1,9 @@
+name: test
+on: [push, pull_request]
+jobs:
+  self-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: chmod +x scripts/upload.sh test/upload_test.sh
+      - run: test/upload_test.sh
