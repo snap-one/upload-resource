@@ -43,3 +43,39 @@ jobs:
           curl -sS -f -X DELETE \
             -H "Authorization: Bearer ${{ secrets.RESOURCE_REPOSITORY_STAGE_TOKEN }}" \
             "${{ vars.RESOURCE_REPOSITORY_STAGE_URL }}/api/v1/resources/${{ steps.upload.outputs.resource-id }}"
+
+  smoke-test-feature-flag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build a disposable test fixture
+        run: echo "upload-resource feature-flag smoke test ${{ github.run_id }}" > smoke-test-ff.bin
+
+      - name: Upload gated behind a feature flag
+        id: upload
+        uses: ./
+        with:
+          file: smoke-test-ff.bin
+          resource-type: ${{ vars.RESOURCE_REPOSITORY_TEST_RESOURCE_TYPE }}
+          version: "0.0.0-ci.${{ github.run_id }}"
+          release-action: feature_flag
+          # TODO: a flag/provider/project already registered in stage's
+          # FEATURE_FLAG_PROVIDERS config — see GET /api/v1/feature-flag-providers.
+          flag: ${{ vars.RESOURCE_REPOSITORY_TEST_FLAG }}
+          provider: ${{ vars.RESOURCE_REPOSITORY_TEST_PROVIDER }}
+          project: ${{ vars.RESOURCE_REPOSITORY_TEST_PROJECT }}
+          api-base-url: ${{ vars.RESOURCE_REPOSITORY_STAGE_URL }}
+          api-token: ${{ secrets.RESOURCE_REPOSITORY_STAGE_TOKEN }}
+
+      - name: Verify outputs
+        run: |
+          test -n "${{ steps.upload.outputs.resource-id }}"
+          test -n "${{ steps.upload.outputs.resource-version }}"
+
+      - name: Clean up the uploaded resource
+        if: always() && steps.upload.outputs.resource-id != ''
+        run: |
+          curl -sS -f -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.RESOURCE_REPOSITORY_STAGE_TOKEN }}" \
+            "${{ vars.RESOURCE_REPOSITORY_STAGE_URL }}/api/v1/resources/${{ steps.upload.outputs.resource-id }}"
