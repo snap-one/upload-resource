@@ -51,3 +51,21 @@ if RELEASE_ACTION=release FILE_PATH="$tmpfile" RESOURCE_TYPE=driver \
 fi
 grep -q 'not permitted' /tmp/upload_test_err.log
 echo "PASS: release-action=release is rejected"
+
+# client-id/client-secret/token-url: exchange for a token, then use it against the resource endpoint.
+TOKEN_PORT=8892
+MOCK_STATUS=200 MOCK_BODY='{"access_token":"exchanged-token"}' python3 test/mock_server.py "$TOKEN_PORT" &
+token_server_pid=$!
+sleep 0.5
+
+captured=$(mktemp)
+CAPTURE_AUTH_HEADER_FILE="$captured" start_mock 201
+FILE_PATH="$tmpfile" RESOURCE_TYPE=driver \
+  API_BASE_URL="http://127.0.0.1:$PORT" CLIENT_ID=ci CLIENT_SECRET=shh \
+  TOKEN_URL="http://127.0.0.1:$TOKEN_PORT" RETRIES=1 GITHUB_OUTPUT="$out" scripts/upload.sh
+kill "$server_pid" "$token_server_pid" 2>/dev/null
+wait "$server_pid" "$token_server_pid" 2>/dev/null || true
+
+grep -q '^resource-id=abc123$' "$out"
+grep -q '^Bearer exchanged-token$' "$captured"
+echo "PASS: client-credentials exchange obtains and uses the token"
