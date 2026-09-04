@@ -10,11 +10,15 @@ body = os.environ.get("MOCK_BODY", '{"id":"abc123","version":"1.0.0"}').encode()
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
-        self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        request_body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
         capture_path = os.environ.get("CAPTURE_AUTH_HEADER_FILE")
         if capture_path:
             with open(capture_path, "w") as f:
                 f.write(self.headers.get("Authorization", ""))
+        capture_body_path = os.environ.get("CAPTURE_BODY_FILE")
+        if capture_body_path:
+            with open(capture_body_path, "wb") as f:
+                f.write(request_body)
         self.send_response(status)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()

@@ -36,10 +36,13 @@ API_TOKEN=$(jq -r '.access_token' <<<"$token_body")
 echo "::add-mask::${API_TOKEN}"
 
 response_file=$(mktemp)
+file_field="file=@${FILE_PATH}"
+[[ -n "${FILENAME:-}" ]] && file_field+=";filename=${FILENAME}"
+
 args=(-sS -o "$response_file" -w '%{http_code}' \
   --retry "${RETRIES:-3}" --retry-connrefused --retry-all-errors \
   -H "Authorization: Bearer ${API_TOKEN}" \
-  -F "file=@${FILE_PATH}" \
+  -F "$file_field" \
   -F "resourceType=${RESOURCE_TYPE}")
 
 [[ -n "${VERSION:-}" ]] && args+=(-F "version=${VERSION}")

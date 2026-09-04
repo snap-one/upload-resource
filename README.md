@@ -51,6 +51,7 @@ need to know it — only set it if your client lives elsewhere.
 | Name | Required | Description |
 |---|---|---|
 | `file` | yes | Path to the file to upload |
+| `filename` | no | Upload the file as this name instead of its local name |
 | `resource-type` | yes | `resourceType` field |
 | `version` | no | Resource version |
 | `metadata` | no | Metadata as a JSON string |

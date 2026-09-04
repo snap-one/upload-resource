@@ -8,6 +8,9 @@ inputs:
   file:
     description: 'Path to the file to upload'
     required: true
+  filename:
+    description: 'Optional filename to upload the file as, overriding the local file name'
+    required: false
   resource-type:
     description: 'Resource type (resourceType field)'
     required: true
@@ -66,6 +69,7 @@ runs:
       run: ${{ github.action_path }}/scripts/upload.sh
       env:
         FILE_PATH: ${{ inputs.file }}
+        FILENAME: ${{ inputs.filename }}
         RESOURCE_TYPE: ${{ inputs.resource-type }}
         VERSION: ${{ inputs.version }}
         METADATA: ${{ inputs.metadata }}
