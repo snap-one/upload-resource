@@ -8,6 +8,11 @@ on:
 # secrets from workflows triggered by a fork's pull_request. Real-API runs
 # only happen on main / manual dispatch.
 
+env:
+  # Same default the action itself bakes in — repeated here because the
+  # cleanup steps below call the API directly, not through the action.
+  TOKEN_URL: https://identity.snapone.com/realms/ADI/protocol/openid-connect/token
+
 jobs:
   smoke-test:
     runs-on: ubuntu-latest
@@ -29,8 +34,11 @@ jobs:
           version: "0.0.0-ci.${{ github.run_id }}"
           # TODO: point at stage, never prod.
           api-base-url: ${{ vars.RESOURCE_REPOSITORY_STAGE_URL }}
-          # TODO: a CI/CD token scoped resources:write + resources:delete against stage.
-          api-token: ${{ secrets.RESOURCE_REPOSITORY_STAGE_TOKEN }}
+          # TODO: a client scoped resources:write + resources:delete against
+          # stage — see docs/keycloak-requirements.md in resource-repository.
+          # The delete scope is only needed for this test's own cleanup step.
+          client-id: ${{ vars.RESOURCE_REPOSITORY_TEST_CLIENT_ID }}
+          client-secret: ${{ secrets.RESOURCE_REPOSITORY_TEST_CLIENT_SECRET }}
 
       - name: Verify outputs
         run: |
@@ -39,9 +47,14 @@ jobs:
 
       - name: Clean up the uploaded resource
         if: always() && steps.upload.outputs.resource-id != ''
+        env:
+          CLIENT_ID: ${{ vars.RESOURCE_REPOSITORY_TEST_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.RESOURCE_REPOSITORY_TEST_CLIENT_SECRET }}
         run: |
-          curl -sS -f -X DELETE \
-            -H "Authorization: Bearer ${{ secrets.RESOURCE_REPOSITORY_STAGE_TOKEN }}" \
+          token=$(curl -sS -f -d grant_type=client_credentials \
+            -d "client_id=$CLIENT_ID" -d "client_secret=$CLIENT_SECRET" \
+            "$TOKEN_URL" | jq -r .access_token)
+          curl -sS -f -X DELETE -H "Authorization: Bearer $token" \
             "${{ vars.RESOURCE_REPOSITORY_STAGE_URL }}/api/v1/resources/${{ steps.upload.outputs.resource-id }}"
 
   smoke-test-feature-flag:
@@ -66,7 +79,8 @@ jobs:
           provider: ${{ vars.RESOURCE_REPOSITORY_TEST_PROVIDER }}
           project: ${{ vars.RESOURCE_REPOSITORY_TEST_PROJECT }}
           api-base-url: ${{ vars.RESOURCE_REPOSITORY_STAGE_URL }}
-          api-token: ${{ secrets.RESOURCE_REPOSITORY_STAGE_TOKEN }}
+          client-id: ${{ vars.RESOURCE_REPOSITORY_TEST_CLIENT_ID }}
+          client-secret: ${{ secrets.RESOURCE_REPOSITORY_TEST_CLIENT_SECRET }}
 
       - name: Verify outputs
         run: |
@@ -75,7 +89,12 @@ jobs:
 
       - name: Clean up the uploaded resource
         if: always() && steps.upload.outputs.resource-id != ''
+        env:
+          CLIENT_ID: ${{ vars.RESOURCE_REPOSITORY_TEST_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.RESOURCE_REPOSITORY_TEST_CLIENT_SECRET }}
         run: |
-          curl -sS -f -X DELETE \
-            -H "Authorization: Bearer ${{ secrets.RESOURCE_REPOSITORY_STAGE_TOKEN }}" \
+          token=$(curl -sS -f -d grant_type=client_credentials \
+            -d "client_id=$CLIENT_ID" -d "client_secret=$CLIENT_SECRET" \
+            "$TOKEN_URL" | jq -r .access_token)
+          curl -sS -f -X DELETE -H "Authorization: Bearer $token" \
             "${{ vars.RESOURCE_REPOSITORY_STAGE_URL }}/api/v1/resources/${{ steps.upload.outputs.resource-id }}"

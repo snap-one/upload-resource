@@ -32,18 +32,16 @@ inputs:
   api-base-url:
     description: 'Base URL of the Resource Repository API'
     required: true
-  api-token:
-    description: 'A ready-to-use bearer JWT. Mutually exclusive with client-id/client-secret/token-url. Pass via secrets — never hardcode.'
-    required: false
   client-id:
-    description: 'OIDC client ID for a client-credentials grant, exchanged for a bearer token before upload. Requires client-secret and token-url.'
-    required: false
+    description: 'OIDC client ID for the client-credentials grant this action exchanges for a bearer token before upload.'
+    required: true
   client-secret:
     description: 'OIDC client secret. Pass via secrets — never hardcode.'
-    required: false
+    required: true
   token-url:
-    description: 'OIDC token endpoint to POST the client-credentials grant to (e.g. the Keycloak realm token endpoint).'
+    description: 'OIDC token endpoint to exchange client-id/client-secret at. Defaults to the shared ADI realm used by all environments — override only if your client lives in a different realm.'
     required: false
+    default: 'https://identity.snapone.com/realms/ADI/protocol/openid-connect/token'
   retries:
     description: 'Retry attempts for transient network/5xx failures'
     required: false
@@ -76,7 +74,6 @@ runs:
         PROVIDER: ${{ inputs.provider }}
         PROJECT: ${{ inputs.project }}
         API_BASE_URL: ${{ inputs.api-base-url }}
-        API_TOKEN: ${{ inputs.api-token }}
         CLIENT_ID: ${{ inputs.client-id }}
         CLIENT_SECRET: ${{ inputs.client-secret }}
         TOKEN_URL: ${{ inputs.token-url }}
