@@ -33,8 +33,17 @@ inputs:
     description: 'Base URL of the Resource Repository API'
     required: true
   api-token:
-    description: 'API token for authentication. Pass via secrets — never hardcode.'
-    required: true
+    description: 'A ready-to-use bearer JWT. Mutually exclusive with client-id/client-secret/token-url. Pass via secrets — never hardcode.'
+    required: false
+  client-id:
+    description: 'OIDC client ID for a client-credentials grant, exchanged for a bearer token before upload. Requires client-secret and token-url.'
+    required: false
+  client-secret:
+    description: 'OIDC client secret. Pass via secrets — never hardcode.'
+    required: false
+  token-url:
+    description: 'OIDC token endpoint to POST the client-credentials grant to (e.g. the Keycloak realm token endpoint).'
+    required: false
   retries:
     description: 'Retry attempts for transient network/5xx failures'
     required: false
@@ -68,4 +77,7 @@ runs:
         PROJECT: ${{ inputs.project }}
         API_BASE_URL: ${{ inputs.api-base-url }}
         API_TOKEN: ${{ inputs.api-token }}
+        CLIENT_ID: ${{ inputs.client-id }}
+        CLIENT_SECRET: ${{ inputs.client-secret }}
+        TOKEN_URL: ${{ inputs.token-url }}
         RETRIES: ${{ inputs.retries }}
