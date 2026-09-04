@@ -86,3 +86,13 @@ kill "$token_pid" "$resource_pid" 2>/dev/null; wait "$token_pid" "$resource_pid"
 
 grep -q '^Bearer exchanged-token$' "$captured"
 echo "PASS: the exchanged token is used against the resource endpoint"
+
+# filename overrides the uploaded file's name in the multipart body.
+captured_body=$(mktemp)
+token_pid=$(start_token_mock); sleep 0.5
+resource_pid=$(CAPTURE_BODY_FILE="$captured_body" start_mock "$PORT" 201); sleep 0.5
+FILENAME=renamed.txt env "${common_env[@]}" scripts/upload.sh
+kill "$token_pid" "$resource_pid" 2>/dev/null; wait "$token_pid" "$resource_pid" 2>/dev/null || true
+
+grep -q 'filename="renamed.txt"' "$captured_body"
+echo "PASS: filename overrides the uploaded file's name"
