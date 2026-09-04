@@ -17,7 +17,8 @@ curl/auth/retry step.
     version: ${{ github.ref_name }}
     metadata: '{"platform":"control4"}'
     api-base-url: https://resources.snapone.com
-    api-token: ${{ secrets.RESOURCE_REPOSITORY_TOKEN }}
+    client-id: ${{ vars.RESOURCE_REPOSITORY_CLIENT_ID }}
+    client-secret: ${{ secrets.RESOURCE_REPOSITORY_CLIENT_SECRET }}
 
 - run: echo "Uploaded ${{ steps.upload.outputs.resource-id }} v${{ steps.upload.outputs.resource-version }}"
 ```
@@ -35,22 +36,15 @@ Gating a release behind a feature flag instead of the default beta (`ManualAppro
     provider: split
     project: home-automation
     api-base-url: https://resources.snapone.com
-    api-token: ${{ secrets.RESOURCE_REPOSITORY_TOKEN }}
-```
-
-Authenticating via an OIDC client-credentials grant instead of a pre-minted token (recommended for CI — no token expiry to manage):
-
-```yaml
-- uses: snap-one/upload-resource@v1
-  with:
-    file: dist/mydriver.c4z
-    resource-type: driver
-    version: 1.2.3
-    api-base-url: https://resources.snapone.com
     client-id: ${{ vars.RESOURCE_REPOSITORY_CLIENT_ID }}
     client-secret: ${{ secrets.RESOURCE_REPOSITORY_CLIENT_SECRET }}
-    token-url: https://keycloak.example.com/realms/snapone/protocol/openid-connect/token
 ```
+
+Ask whoever administers Keycloak clients for `client-id`/`client-secret` — a
+confidential, client-credentials-only client scoped `resources:write` (see
+[resource-repository's Keycloak requirements doc](https://github.com/snap-one/resource-repository/blob/main/docs/keycloak-requirements.md)).
+`token-url` defaults to the shared realm every environment uses, so you don't
+need to know it — only set it if your client lives elsewhere.
 
 ## Inputs
 
@@ -65,16 +59,10 @@ Authenticating via an OIDC client-credentials grant instead of a pre-minted toke
 | `provider` | no | Feature flag provider (e.g. `launchdarkly`, `split`) — required with the flag actions above |
 | `project` | no | Provider project identifier, scoping flag targeting rules |
 | `api-base-url` | yes | Base URL of the Resource Repository API |
-| `api-token` | one of¹ | A ready-to-use bearer JWT — pass via `secrets`, never hardcode |
-| `client-id` | one of¹ | OIDC client ID for a client-credentials grant, exchanged for a bearer token before upload |
-| `client-secret` | one of¹ | OIDC client secret — pass via `secrets`, never hardcode. Required with `client-id`. |
-| `token-url` | one of¹ | OIDC token endpoint to exchange `client-id`/`client-secret` at. Required with `client-id`. |
+| `client-id` | yes | OIDC client ID for the client-credentials grant this action exchanges for a bearer token before upload |
+| `client-secret` | yes | OIDC client secret — pass via `secrets`, never hardcode |
+| `token-url` | no | OIDC token endpoint to exchange at. Defaults to the shared realm all environments use — override only if your client lives elsewhere. |
 | `retries` | no | Retry attempts for transient network/5xx failures (default `3`) |
-
-¹ Provide either `api-token`, or `client-id`+`client-secret`+`token-url`. The
-Resource Repository API only accepts OIDC JWT bearer tokens — there's no
-static API-token mechanism, so a raw client secret sent directly as
-`api-token` will 401.
 
 ## Outputs
 
