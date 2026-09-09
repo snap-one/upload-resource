@@ -14,9 +14,17 @@ jobs:
       - name: Start mock servers
         shell: bash
         run: |
-          MOCK_STATUS=200 MOCK_BODY='{"access_token":"exchanged-token"}' node test/mock_server.js 8892 >/dev/null 2>&1 &
-          node test/mock_server.js 8891 >/dev/null 2>&1 &
-          sleep 1
+          rm -f .token-ready .resource-ready
+          MOCK_STATUS=200 MOCK_BODY='{"access_token":"exchanged-token"}' MOCK_READY_FILE=.token-ready node test/mock_server.js 8892 >token-mock.log 2>&1 &
+          MOCK_READY_FILE=.resource-ready node test/mock_server.js 8891 >resource-mock.log 2>&1 &
+          for attempt in {1..40}; do
+            if [[ -f .token-ready && -f .resource-ready ]]; then
+              exit 0
+            fi
+            sleep 0.25
+          done
+          cat token-mock.log resource-mock.log
+          exit 1
       - name: Run local action
         id: upload
         uses: ./

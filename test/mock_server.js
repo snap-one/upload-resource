@@ -6,7 +6,7 @@ const http = require('node:http');
 const status = Number.parseInt(process.env.MOCK_STATUS || '201', 10);
 const body = process.env.MOCK_BODY || '{"id":"abc123","version":"1.0.0"}';
 
-http.createServer((request, response) => {
+const server = http.createServer((request, response) => {
   const chunks = [];
   request.on('data', (chunk) => chunks.push(chunk));
   request.on('end', () => {
@@ -19,4 +19,10 @@ http.createServer((request, response) => {
     response.writeHead(status, {'content-length': Buffer.byteLength(body)});
     response.end(body);
   });
-}).listen(Number.parseInt(process.argv[2], 10), '127.0.0.1');
+});
+
+server.listen(Number.parseInt(process.argv[2], 10), '127.0.0.1', () => {
+  if (process.env.MOCK_READY_FILE) {
+    fs.writeFileSync(process.env.MOCK_READY_FILE, 'ready');
+  }
+});
