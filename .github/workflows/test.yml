@@ -7,3 +7,30 @@ jobs:
       - uses: actions/checkout@v4
       - run: chmod +x scripts/upload.sh test/upload_test.sh
       - run: test/upload_test.sh
+
+  windows-action-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start mock servers
+        shell: bash
+        run: |
+          MOCK_STATUS=200 MOCK_BODY='{"access_token":"exchanged-token"}' python test/mock_server.py 8892 >/dev/null 2>&1 &
+          python test/mock_server.py 8891 >/dev/null 2>&1 &
+          sleep 1
+      - name: Run local action
+        id: upload
+        uses: ./
+        with:
+          file: README.md
+          resource-type: test
+          api-base-url: http://127.0.0.1:8891
+          client-id: ci
+          client-secret: test-secret
+          token-url: http://127.0.0.1:8892
+          retries: 1
+      - name: Verify outputs
+        shell: bash
+        run: |
+          test '${{ steps.upload.outputs.resource-id }}' = abc123
+          test '${{ steps.upload.outputs.resource-version }}' = 1.0.0
