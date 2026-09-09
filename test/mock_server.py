@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Minimal HTTP server for exercising upload.sh's success/failure paths in tests."""
+"""Legacy Python mock server retained for local compatibility."""
 import http.server
 import os
 import sys

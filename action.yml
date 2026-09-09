@@ -53,45 +53,11 @@ inputs:
 outputs:
   resource-id:
     description: 'ID of the created resource'
-    value: ${{ steps.upload.outputs.resource-id }}
   resource-version:
     description: 'Version of the created resource'
-    value: ${{ steps.upload.outputs.resource-version }}
   response:
     description: 'Full JSON response body from the API'
-    value: ${{ steps.upload.outputs.response }}
 
 runs:
-  using: composite
-  steps:
-    - id: upload
-      shell: bash
-      run: |
-        action_path="$GITHUB_ACTION_PATH"
-        if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
-          if command -v cygpath >/dev/null 2>&1; then
-            action_path="$(cygpath -u "$action_path")"
-          elif command -v wslpath >/dev/null 2>&1; then
-            action_path="$(wslpath -u "$action_path")"
-          else
-            action_path="${action_path//\\//}"
-          fi
-        fi
-        script_path="$action_path/scripts/upload.sh"
-        [[ -f "$script_path" ]] || { echo "::error::Upload script not found: $script_path"; exit 1; }
-        bash "$script_path"
-      env:
-        FILE_PATH: ${{ inputs.file }}
-        FILENAME: ${{ inputs.filename }}
-        RESOURCE_TYPE: ${{ inputs.resource-type }}
-        VERSION: ${{ inputs.version }}
-        METADATA: ${{ inputs.metadata }}
-        RELEASE_ACTION: ${{ inputs.release-action }}
-        FLAG: ${{ inputs.flag }}
-        PROVIDER: ${{ inputs.provider }}
-        PROJECT: ${{ inputs.project }}
-        API_BASE_URL: ${{ inputs.api-base-url }}
-        CLIENT_ID: ${{ inputs.client-id }}
-        CLIENT_SECRET: ${{ inputs.client-secret }}
-        TOKEN_URL: ${{ inputs.token-url }}
-        RETRIES: ${{ inputs.retries }}
+  using: node24
+  main: scripts/upload.js
