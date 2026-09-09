@@ -66,7 +66,20 @@ runs:
   steps:
     - id: upload
       shell: bash
-      run: ${{ github.action_path }}/scripts/upload.sh
+      run: |
+        action_path="$GITHUB_ACTION_PATH"
+        if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
+          if command -v cygpath >/dev/null 2>&1; then
+            action_path="$(cygpath -u "$action_path")"
+          elif command -v wslpath >/dev/null 2>&1; then
+            action_path="$(wslpath -u "$action_path")"
+          else
+            action_path="${action_path//\\//}"
+          fi
+        fi
+        script_path="$action_path/scripts/upload.sh"
+        [[ -f "$script_path" ]] || { echo "::error::Upload script not found: $script_path"; exit 1; }
+        bash "$script_path"
       env:
         FILE_PATH: ${{ inputs.file }}
         FILENAME: ${{ inputs.filename }}
