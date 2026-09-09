@@ -12,30 +12,19 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Start mock servers
-        shell: pwsh
+        shell: bash
         run: |
-          Remove-Item .token-ready, .resource-ready -ErrorAction SilentlyContinue
-
-          $env:MOCK_STATUS = '200'
-          $env:MOCK_BODY = '{"access_token":"exchanged-token"}'
-          $env:MOCK_READY_FILE = '.token-ready'
-          $tokenProcess = Start-Process node -ArgumentList 'test/mock_server.js', '8892' -NoNewWindow -PassThru
-
-          $env:MOCK_STATUS = $null
-          $env:MOCK_BODY = $null
-          $env:MOCK_READY_FILE = '.resource-ready'
-          $resourceProcess = Start-Process node -ArgumentList 'test/mock_server.js', '8891' -NoNewWindow -PassThru
-
-          for ($attempt = 0; $attempt -lt 40; $attempt++) {
-            if ((Test-Path .token-ready) -and (Test-Path .resource-ready)) {
+          rm -f .token-ready .resource-ready
+          MOCK_STATUS=200 MOCK_BODY='{"access_token":"exchanged-token"}' MOCK_READY_FILE=.token-ready node test/mock_server.js 8892 >token-mock.log 2>&1 &
+          MOCK_READY_FILE=.resource-ready node test/mock_server.js 8891 >resource-mock.log 2>&1 &
+          for attempt in {1..40}; do
+            if [[ -f .token-ready && -f .resource-ready ]]; then
               exit 0
-            }
-            if ($tokenProcess.HasExited -or $resourceProcess.HasExited) {
-              throw 'A mock server exited before becoming ready'
-            }
-            Start-Sleep -Milliseconds 250
-          }
-          throw 'Timed out waiting for mock servers'
+            fi
+            sleep 0.25
+          done
+          cat token-mock.log resource-mock.log
+          exit 1
 
       - name: Run local action
         id: upload
