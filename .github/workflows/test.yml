@@ -5,8 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: chmod +x scripts/upload.sh test/upload_test.sh
-      - run: test/upload_test.sh
+      - run: node test/upload_test.js
 
   windows-action-test:
     runs-on: windows-latest
@@ -15,8 +14,8 @@ jobs:
       - name: Start mock servers
         shell: bash
         run: |
-          MOCK_STATUS=200 MOCK_BODY='{"access_token":"exchanged-token"}' python test/mock_server.py 8892 >/dev/null 2>&1 &
-          python test/mock_server.py 8891 >/dev/null 2>&1 &
+          MOCK_STATUS=200 MOCK_BODY='{"access_token":"exchanged-token"}' node test/mock_server.js 8892 >/dev/null 2>&1 &
+          node test/mock_server.js 8891 >/dev/null 2>&1 &
           sleep 1
       - name: Run local action
         id: upload

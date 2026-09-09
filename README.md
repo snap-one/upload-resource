@@ -3,7 +3,8 @@
 Reusable GitHub Action that uploads a build artifact to the
 [Resource Repository](https://github.com/snap-one/resource-repository) API
 (`POST /api/v1/resources`), so consuming repos don't each hand-roll their own
-curl/auth/retry step.
+auth/retry step. It uses the GitHub Actions-provided Node runtime and requires
+no tools or packages to be installed on the runner.
 
 ## Usage
 
@@ -88,8 +89,9 @@ allowlist policy is in effect, that this repo is on it.
 ## Development
 
 ```bash
-test/upload_test.sh
+node test/upload_test.js
 ```
 
-Runs the action's upload logic against a local mock server (success + 500
-paths). CI runs the same script on every push/PR.
+Runs the action's upload logic against local mock servers, including success,
+retry, authentication, filename override, output, and blocked-release paths.
+CI runs the same test on every push/PR.
