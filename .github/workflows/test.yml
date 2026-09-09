@@ -4,27 +4,39 @@ jobs:
   self-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: node test/upload_test.js
 
   windows-action-test:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Start mock servers
-        shell: bash
+        shell: pwsh
         run: |
-          rm -f .token-ready .resource-ready
-          MOCK_STATUS=200 MOCK_BODY='{"access_token":"exchanged-token"}' MOCK_READY_FILE=.token-ready node test/mock_server.js 8892 >token-mock.log 2>&1 &
-          MOCK_READY_FILE=.resource-ready node test/mock_server.js 8891 >resource-mock.log 2>&1 &
-          for attempt in {1..40}; do
-            if [[ -f .token-ready && -f .resource-ready ]]; then
+          Remove-Item .token-ready, .resource-ready -ErrorAction SilentlyContinue
+
+          $env:MOCK_STATUS = '200'
+          $env:MOCK_BODY = '{"access_token":"exchanged-token"}'
+          $env:MOCK_READY_FILE = '.token-ready'
+          $tokenProcess = Start-Process node -ArgumentList 'test/mock_server.js', '8892' -NoNewWindow -PassThru
+
+          $env:MOCK_STATUS = $null
+          $env:MOCK_BODY = $null
+          $env:MOCK_READY_FILE = '.resource-ready'
+          $resourceProcess = Start-Process node -ArgumentList 'test/mock_server.js', '8891' -NoNewWindow -PassThru
+
+          for ($attempt = 0; $attempt -lt 40; $attempt++) {
+            if ((Test-Path .token-ready) -and (Test-Path .resource-ready)) {
               exit 0
-            fi
-            sleep 0.25
-          done
-          cat token-mock.log resource-mock.log
-          exit 1
+            }
+            if ($tokenProcess.HasExited -or $resourceProcess.HasExited) {
+              throw 'A mock server exited before becoming ready'
+            }
+            Start-Sleep -Milliseconds 250
+          }
+          throw 'Timed out waiting for mock servers'
+
       - name: Run local action
         id: upload
         uses: ./
@@ -37,7 +49,10 @@ jobs:
           token-url: http://127.0.0.1:8892
           retries: 1
       - name: Verify outputs
-        shell: bash
+        shell: pwsh
+        env:
+          RESOURCE_ID: ${{ steps.upload.outputs.resource-id }}
+          RESOURCE_VERSION: ${{ steps.upload.outputs.resource-version }}
         run: |
-          test '${{ steps.upload.outputs.resource-id }}' = abc123
-          test '${{ steps.upload.outputs.resource-version }}' = 1.0.0
+          if ($env:RESOURCE_ID -ne 'abc123') { throw "Unexpected resource ID: $env:RESOURCE_ID" }
+          if ($env:RESOURCE_VERSION -ne '1.0.0') { throw "Unexpected resource version: $env:RESOURCE_VERSION" }
