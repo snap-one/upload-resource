@@ -63,10 +63,21 @@ async function requestWithRetries(url, options, retries, operation) {
   throw new Error(`${operation} failed after ${retries} retries: ${lastError.message}`);
 }
 
+// Cloudflare's own error pages (WAF blocks, 52x) are ~80 lines of HTML whose only
+// useful part is the Ray ID the zone admin needs to find the rule that fired.
+// Origin errors also carry a cf-ray header, so key off the page markup instead.
+function describeCloudflareError(response, body) {
+  if (!body.includes('cf-error-details')) return null;
+  const rayId = response.headers.get('cf-ray') || body.match(/Ray ID: <strong[^>]*>([^<]+)/)?.[1] || 'unknown';
+  const reason = body.match(/<h1[^>]*>([^<]+)<\/h1>/)?.[1] || body.match(/<title>([^<]+)<\/title>/)?.[1] || 'Cloudflare error page';
+  return `${reason.trim()} (Cloudflare Ray ID ${rayId}). Cloudflare stopped the request before it reached the service; look up the Ray ID in the zone's Security > Events to see which rule fired.`;
+}
+
 async function parseJsonResponse(response, operation) {
   const body = await response.text();
   if (!response.ok) {
-    throw new Error(`${operation} failed with HTTP ${response.status}: ${body}`);
+    const detail = describeCloudflareError(response, body) ?? body;
+    throw new Error(`${operation} failed with HTTP ${response.status}: ${detail}`);
   }
 
   try {
