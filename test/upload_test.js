@@ -49,10 +49,21 @@ async function main() {
   let uploadRequests = 0;
   let capturedAuthorization = '';
   let capturedBody = '';
+  let cloudflareBlock = false;
   const resource = await listen(async (request, response) => {
     uploadRequests += 1;
     capturedAuthorization = request.headers.authorization;
     capturedBody = (await readBody(request)).toString();
+    if (cloudflareBlock) {
+      // Trimmed from a real WAF block of a .dmg upload.
+      response.writeHead(403, {'content-type': 'text/html', 'cf-ray': 'a45d56505fd66300-IAD'});
+      response.end('<!DOCTYPE html>\n<html><head><title>Attention Required! | Cloudflare</title></head><body>\n'
+        + '<div id="cf-error-details" class="cf-error-details-wrapper">\n'
+        + '<h1 data-translate="block_headline">Sorry, you have been blocked</h1>\n'
+        + '<span class="cf-footer-item">Cloudflare Ray ID: <strong class="font-semibold">a45d56505fd66300</strong></span>\n'
+        + '</div></body></html>');
+      return;
+    }
     if (uploadRequests === 1) {
       response.writeHead(500);
       response.end('{"error":"retry me"}');
@@ -96,7 +107,15 @@ async function main() {
 
     process.env['INPUT_RELEASE-ACTION'] = 'release';
     await assert.rejects(run(), /release is not permitted/);
-    console.log('PASS: upload succeeds, retries transient failures, authenticates, and sets outputs');
+
+    process.env['INPUT_RELEASE-ACTION'] = '';
+    cloudflareBlock = true;
+    await assert.rejects(run(), (error) => {
+      assert.match(error.message, /^Resource upload failed with HTTP 403: Sorry, you have been blocked \(Cloudflare Ray ID a45d56505fd66300-IAD\)/);
+      assert.doesNotMatch(error.message, /<html/);
+      return true;
+    });
+    console.log('PASS: upload succeeds, retries transient failures, authenticates, sets outputs, and summarizes Cloudflare blocks');
   } finally {
     await Promise.all([close(token.server), close(resource.server)]);
     await fs.rm(tempDir, {recursive: true, force: true});

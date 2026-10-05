@@ -75,6 +75,7 @@ need to know it — only set it if your client lives elsewhere.
 | `response` | Full JSON response body |
 
 On any non-2xx response the step fails with the HTTP status and response body.
+When the response is a Cloudflare error page (for example a WAF block), the step prints its headline and Cloudflare Ray ID instead of the page's HTML.
 The token is masked via `::add-mask::` before the request runs, so it never
 appears in logs.
 
