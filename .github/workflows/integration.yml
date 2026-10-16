@@ -98,3 +98,64 @@ jobs:
             "$TOKEN_URL" | jq -r .access_token)
           curl -sS -f -X DELETE -H "Authorization: Bearer $token" \
             "${{ vars.RESOURCE_REPOSITORY_STAGE_URL }}/api/v1/resources/${{ steps.upload.outputs.resource-id }}"
+
+  smoke-test-batch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build two disposable test fixtures
+        run: |
+          mkdir batch
+          echo "upload-resource batch smoke test 1 ${{ github.run_id }}" > batch/smoke-test-batch-1.bin
+          echo "upload-resource batch smoke test 2 ${{ github.run_id }}" > batch/smoke-test-batch-2.bin
+
+      - name: Upload both into one batch
+        id: upload
+        uses: ./
+        with:
+          file: batch/*.bin
+          resource-type: ${{ vars.RESOURCE_REPOSITORY_TEST_RESOURCE_TYPE }}
+          version: "0.0.0-ci.${{ github.run_id }}"
+          # Its own batch rather than the daily default the other jobs share,
+          # so the batch holds exactly these two files.
+          batch-name: upload-resource-ci-${{ github.run_id }}-${{ github.run_attempt }}
+          api-base-url: ${{ vars.RESOURCE_REPOSITORY_STAGE_URL }}
+          client-id: ${{ vars.RESOURCE_REPOSITORY_TEST_CLIENT_ID }}
+          client-secret: ${{ secrets.RESOURCE_REPOSITORY_TEST_CLIENT_SECRET }}
+
+      - name: Verify the batch reports both files
+        env:
+          CLIENT_ID: ${{ vars.RESOURCE_REPOSITORY_TEST_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.RESOURCE_REPOSITORY_TEST_CLIENT_SECRET }}
+          BATCH_ID: ${{ steps.upload.outputs.batch-id }}
+          BATCH_NAME: ${{ steps.upload.outputs.batch-name }}
+          RESOURCE_IDS: ${{ steps.upload.outputs.resource-ids }}
+        run: |
+          test "$BATCH_NAME" = "upload-resource-ci-${{ github.run_id }}-${{ github.run_attempt }}"
+          test "$(jq length <<<"$RESOURCE_IDS")" = 2
+          token=$(curl -sS -f -d grant_type=client_credentials \
+            -d "client_id=$CLIENT_ID" -d "client_secret=$CLIENT_SECRET" \
+            "$TOKEN_URL" | jq -r .access_token)
+          curl -sS -f -H "Authorization: Bearer $token" \
+            "${{ vars.RESOURCE_REPOSITORY_STAGE_URL }}/api/v1/batches/$BATCH_ID/resources" > batch.json
+          jq -e --argjson ids "$RESOURCE_IDS" --arg name "$BATCH_NAME" '
+            .batch.name == $name
+            and (.batch.counts | add) == 2
+            and ([.data[].id] | sort) == ($ids | sort)
+          ' batch.json
+
+      - name: Clean up the uploaded resources
+        if: always() && steps.upload.outputs.resource-ids != ''
+        env:
+          CLIENT_ID: ${{ vars.RESOURCE_REPOSITORY_TEST_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.RESOURCE_REPOSITORY_TEST_CLIENT_SECRET }}
+          RESOURCE_IDS: ${{ steps.upload.outputs.resource-ids }}
+        run: |
+          token=$(curl -sS -f -d grant_type=client_credentials \
+            -d "client_id=$CLIENT_ID" -d "client_secret=$CLIENT_SECRET" \
+            "$TOKEN_URL" | jq -r .access_token)
+          for id in $(jq -r '.[]' <<<"$RESOURCE_IDS"); do
+            curl -sS -f -X DELETE -H "Authorization: Bearer $token" \
+              "${{ vars.RESOURCE_REPOSITORY_STAGE_URL }}/api/v1/resources/$id"
+          done

@@ -30,7 +30,8 @@ jobs:
         id: upload
         uses: ./
         with:
-          file: README.md
+          # A wildcard exercises Windows path handling; it matches README.md only.
+          file: "*.md"
           resource-type: test
           api-base-url: http://127.0.0.1:8891
           client-id: ci
@@ -42,6 +43,14 @@ jobs:
         env:
           RESOURCE_ID: ${{ steps.upload.outputs.resource-id }}
           RESOURCE_VERSION: ${{ steps.upload.outputs.resource-version }}
+          RESOURCE_IDS: ${{ steps.upload.outputs.resource-ids }}
+          BATCH_ID: ${{ steps.upload.outputs.batch-id }}
+          BATCH_NAME: ${{ steps.upload.outputs.batch-name }}
+          SHA256: ${{ steps.upload.outputs.sha256 }}
         run: |
           if ($env:RESOURCE_ID -ne 'abc123') { throw "Unexpected resource ID: $env:RESOURCE_ID" }
           if ($env:RESOURCE_VERSION -ne '1.0.0') { throw "Unexpected resource version: $env:RESOURCE_VERSION" }
+          if ($env:RESOURCE_IDS -ne '["abc123"]') { throw "Unexpected resource IDs: $env:RESOURCE_IDS" }
+          if ($env:BATCH_ID -ne 'batch-123') { throw "Unexpected batch ID: $env:BATCH_ID" }
+          if ($env:BATCH_NAME -notmatch '^upload-resource-\d{4}-\d{2}-\d{2}-test$') { throw "Unexpected batch name: $env:BATCH_NAME" }
+          if ($env:SHA256 -ne (Get-FileHash README.md -Algorithm SHA256).Hash.ToLower()) { throw "Unexpected SHA-256: $env:SHA256" }

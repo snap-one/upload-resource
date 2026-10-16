@@ -16,8 +16,13 @@ const server = http.createServer((request, response) => {
     if (process.env.CAPTURE_BODY_FILE) {
       fs.writeFileSync(process.env.CAPTURE_BODY_FILE, Buffer.concat(chunks));
     }
-    response.writeHead(status, {'content-length': Buffer.byteLength(body)});
-    response.end(body);
+    // Echo batchName back as the batch an upload joined, as the API does.
+    const batchName = Buffer.concat(chunks).toString().match(/name="batchName"\r\n\r\n([^\r]*)\r\n/)?.[1];
+    const reply = batchName
+      ? JSON.stringify({...JSON.parse(body), batch: {id: 'batch-123', name: batchName, generated: false}})
+      : body;
+    response.writeHead(status, {'content-length': Buffer.byteLength(reply)});
+    response.end(reply);
   });
 });
 
