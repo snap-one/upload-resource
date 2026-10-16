@@ -6,10 +6,13 @@ branding:
 
 inputs:
   file:
-    description: 'Path to the file to upload'
+    description: 'Path of the file to upload, or several paths one per line. The last path segment may use * wildcards. All files upload into the same batch.'
     required: true
   filename:
-    description: 'Optional filename to upload the file as, overriding the local file name'
+    description: 'Optional filename to upload the file as, overriding the local file name. Only allowed when file names a single file.'
+    required: false
+  batch-name:
+    description: 'Batch to upload into (trimmed, at most 128 characters). Defaults to <repo name>-<UTC date YYYY-MM-DD>-<resource type>, so every run in a repo on the same UTC day shares one batch per type.'
     required: false
   resource-type:
     description: 'Resource type (resourceType field)'
@@ -52,11 +55,21 @@ inputs:
 
 outputs:
   resource-id:
-    description: 'ID of the created resource'
+    description: 'ID of the created resource (the first file, when several upload)'
   resource-version:
-    description: 'Version of the created resource'
+    description: 'Version of the created resource (the first file)'
   response:
-    description: 'Full JSON response body from the API'
+    description: 'Full JSON response body from the API (the first file)'
+  batch-id:
+    description: 'ID of the batch the files joined'
+  batch-name:
+    description: 'Name of the batch the files joined'
+  resource-ids:
+    description: 'JSON array of the created resource IDs, in upload order'
+  responses:
+    description: 'JSON array of the response bodies, in upload order'
+  sha256:
+    description: 'Hex SHA-256 of the uploaded file (the first file)'
 
 runs:
   using: node20
