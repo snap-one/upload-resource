@@ -23,6 +23,9 @@ inputs:
   metadata:
     description: 'Optional metadata as a JSON string'
     required: false
+  signatures:
+    description: 'Optional JSON array of publisher signatures over the file, each {"keyId", "algorithm", "signature"} with a base64 signature, sent with the upload so the Resource Repository verifies and stores them. Only allowed when file names a single file.'
+    required: false
   release-action:
     description: 'Optional release action: reject, feature_flag, or feature_flag_variation. "release" (immediate production release) is blocked — promote via the admin UI instead.'
     required: false

@@ -61,6 +61,29 @@ Gating a release behind a feature flag instead of the default beta (`ManualAppro
     client-secret: ${{ secrets.RESOURCE_REPOSITORY_CLIENT_SECRET }}
 ```
 
+Sending a publisher signature with the upload, so the Resource Repository verifies and stores it before anything is saved:
+
+```yaml
+- name: Sign the package
+  id: sign
+  env:
+    SIGNING_KEY: ${{ secrets.PUBLISHER_SIGNING_KEY }}
+    KEY_ID: ${{ vars.PUBLISHER_KEY_ID }}
+  run: |
+    sig=$(openssl dgst -sha256 -sign <(printf '%s' "$SIGNING_KEY") dist/mydriver.c4z | base64 -w0)
+    echo "signatures=$(jq -cn --arg keyId "$KEY_ID" --arg sig "$sig" '[{keyId: $keyId, algorithm: "ecdsa-p256-sha256", signature: $sig}]')" >> "$GITHUB_OUTPUT"
+
+- uses: snap-one/upload-resource@v1
+  with:
+    file: dist/mydriver.c4z
+    resource-type: driver
+    version: ${{ github.ref_name }}
+    signatures: ${{ steps.sign.outputs.signatures }}
+    api-base-url: https://resources.snapone.com
+    client-id: ${{ vars.RESOURCE_REPOSITORY_CLIENT_ID }}
+    client-secret: ${{ secrets.RESOURCE_REPOSITORY_CLIENT_SECRET }}
+```
+
 Ask whoever administers Keycloak clients for `client-id`/`client-secret`: a
 confidential, client-credentials-only client scoped `resources:write`, with the
 `basic` client scope so its tokens carry `sub` (see
@@ -87,6 +110,17 @@ A later upload on the same day joins that day's batch even after earlier files i
 
 After the upload, the step summary lists each file with its version and admission verdict, and links the batch in the admin workspace (`<api-base-url>/admin/resources?view=pre-release&group=batch&batch=<batch-id>`).
 
+## Signatures
+
+`signatures` sends publisher signatures in the same request as the file, as the `signatures` form field of `POST /api/v1/resources`.
+The API verifies each one before storing anything: the key exists, is an active publisher key inside its validity window, is allowed for the resource type and belongs to the caller's organization, and the signature verifies over the uploaded bytes.
+Sending them with the upload saves a separate attach call (`POST /api/v1/resources/{id}/signatures`), which needs its own permission, and a version of a resource type whose signature policy is `required` cannot be released until it carries a valid publisher signature.
+`keyId` is `sha256:` followed by the hex SHA-256 of the key's DER SubjectPublicKeyInfo, as `GET /api/v1/public/signing-keys` lists it.
+See [resource-repository's signatures doc](https://github.com/snap-one/resource-repository/blob/main/docs/signatures.md).
+
+The action checks that `signatures` is a JSON array and leaves the rest to the API.
+A signature covers one file's bytes, so the action refuses `signatures` when several files upload.
+
 ## Inputs
 
 | Name | Required | Description |
@@ -97,6 +131,7 @@ After the upload, the step summary lists each file with its version and admissio
 | `batch-name` | no | Batch to upload into, trimmed, at most 128 characters. Defaults to `<repo name>-<UTC date>-<resource type>`; see [Batches](#batches). |
 | `version` | no | Resource version, applied to every file |
 | `metadata` | no | Metadata as a JSON string, applied to every file |
+| `signatures` | no | JSON array of publisher signatures over the file, each `{"keyId", "algorithm", "signature"}`, where `algorithm` is `ed25519` or `ecdsa-p256-sha256` and `signature` is base64. The API verifies and stores them with the upload; see [Signatures](#signatures). Only allowed when `file` names a single file. |
 | `release-action` | no | `reject`, `feature_flag`, or `feature_flag_variation`. Omitted defaults to beta (`ManualApproval`). **`release` (immediate production release) is rejected by this action**; promote via the admin UI instead. |
 | `flag` | no | Feature flag name, required when `release-action` is `feature_flag`/`feature_flag_variation` |
 | `provider` | no | Feature flag provider (e.g. `launchdarkly`, `split`), required with the flag actions above |
@@ -129,6 +164,7 @@ The token is masked via `::add-mask::` before the request runs, so it never appe
 
 - **Integrity.** The action hashes each file locally and fails when the API reports a different `sha256` for what it stored.
 - **Admission.** When the resource type has an admission plugin, a rejected upload (HTTP 422 `ADMISSION_REJECTED`) fails the step with one line per finding: severity, code, message and path. Warning findings on an accepted upload show as `::warning::` annotations.
+- **Signatures.** When the API refuses a signature (HTTP 422 `SIGNATURE_REJECTED`), nothing is stored and the step fails with one line per refused signature: its index, key ID, reason and message.
 - **Cloudflare.** When the response is a Cloudflare error page (for example a WAF block), the step prints its headline and Cloudflare Ray ID instead of the page's HTML.
 
 ## Troubleshooting
@@ -154,5 +190,5 @@ node test/upload_test.js
 
 Runs the action's upload logic against local mock servers, including success,
 retry, authentication, batch naming, multi-file and wildcard input, integrity,
-admission, step summary, filename override, output, and blocked-release paths.
+admission, signatures, step summary, filename override, output, and blocked-release paths.
 CI runs the same test on every push/PR.

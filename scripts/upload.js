@@ -91,6 +91,12 @@ function explainUploadFailure(status, body) {
   } catch {
     return null;
   }
+  if (Array.isArray(rejection?.signatures)) {
+    return [
+      `${rejection.error?.message ?? 'signature rejected'} (${rejection.error?.code ?? 'SIGNATURE_REJECTED'}), refused ${rejection.signatures.length} signature(s):`,
+      ...rejection.signatures.map((refusal) => `  signatures[${refusal.index}] ${refusal.keyId}: ${refusal.reason}: ${refusal.message}`),
+    ].join('\n');
+  }
   const admission = rejection?.admission;
   if (!Array.isArray(admission?.findings)) return null;
   const plugin = [admission.plugin?.filename, admission.plugin?.version].filter(Boolean).join(' ');
@@ -223,6 +229,22 @@ async function run({now = new Date()} = {}) {
   if (filename && files.length > 1) {
     throw new Error(`filename can only be set for a single file, but file matched ${files.length}`);
   }
+  // A signature covers one file's bytes, so it cannot apply to several.
+  const signatures = input('SIGNATURES').trim();
+  if (signatures) {
+    if (files.length > 1) {
+      throw new Error(`signatures can only be set for a single file, but file matched ${files.length}`);
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(signatures);
+    } catch (error) {
+      throw new Error(`signatures must be a JSON array of {"keyId", "algorithm", "signature"}, but it is not valid JSON: ${error.message}`);
+    }
+    if (!Array.isArray(parsed)) {
+      throw new Error('signatures must be a JSON array of {"keyId", "algorithm", "signature"}, but it is not an array');
+    }
+  }
   const batchName = input('BATCH-NAME').trim() || defaultBatchName(resourceType, now);
   if ([...batchName].length > MAX_BATCH_NAME_LENGTH) {
     throw new Error(`batch-name must be at most ${MAX_BATCH_NAME_LENGTH} characters, got ${[...batchName].length}: ${batchName}`);
@@ -267,6 +289,7 @@ async function run({now = new Date()} = {}) {
         const value = input(inputName);
         if (value) form.append(fieldName, value);
       }
+      if (signatures) form.append('signatures', signatures);
 
       const uploadResponse = await requestWithRetries(`${baseUrl}/api/v1/resources`, {
         method: 'POST',
