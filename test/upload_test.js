@@ -10,6 +10,7 @@ const {after, before, beforeEach, describe, test} = require('node:test');
 const {run} = require('../scripts/upload');
 
 const NOW = new Date('2026-10-16T23:30:00Z');
+const SIGNATURES = '[{"keyId":"sha256:2c26","algorithm":"ecdsa-p256-sha256","signature":"MEUCIQ=="}]';
 const BATCH = {id: '01927b2e-7a10-7cc3-8d2a-5b0f6f1f2a01', generated: false, createdBy: 'ci-sub', uploader: 'ci'};
 
 function listen(handler) {
@@ -128,6 +129,7 @@ describe('upload-resource', () => {
       'INPUT_BATCH-NAME': '',
       'INPUT_VERSION': '1.0.0',
       'INPUT_METADATA': '{"platform":"control4"}',
+      'INPUT_SIGNATURES': '',
       'INPUT_RELEASE-ACTION': '',
       'INPUT_FLAG': '',
       'INPUT_PROVIDER': '',
@@ -162,6 +164,7 @@ describe('upload-resource', () => {
     assert.equal(field(upload.body, 'resourceType'), 'driver');
     assert.equal(field(upload.body, 'metadata'), '{"platform":"control4"}');
     assert.equal(field(upload.body, 'batchName'), 'upload-resource-2026-10-16-driver');
+    assert.equal(field(upload.body, 'signatures'), undefined);
 
     const out = await outputs();
     assert.equal(out['resource-id'], 'id-2');
@@ -233,6 +236,43 @@ describe('upload-resource', () => {
     process.env.INPUT_FILENAME = 'renamed.bin';
     await assert.rejects(run({now: NOW}), /filename can only be set for a single file, but file matched 2/);
     assert.equal(uploads.length, 0);
+  });
+
+  test('signatures are sent with a single file', async () => {
+    process.env.INPUT_SIGNATURES = `  ${SIGNATURES}\n`;
+    await run({now: NOW});
+    assert.equal(field(uploads[0].body, 'signatures'), SIGNATURES);
+  });
+
+  test('signatures that are not a JSON array fail before uploading', async () => {
+    process.env.INPUT_SIGNATURES = '{"keyId":"sha256:2c26"';
+    await assert.rejects(run({now: NOW}), /signatures must be a JSON array .*, but it is not valid JSON/);
+    process.env.INPUT_SIGNATURES = '{"keyId":"sha256:2c26","algorithm":"ed25519","signature":"MEUCIQ=="}';
+    await assert.rejects(run({now: NOW}), /signatures must be a JSON array .*, but it is not an array/);
+    assert.equal(tokenRequests, 0);
+  });
+
+  test('signatures are refused when several files match', async () => {
+    process.env.INPUT_FILE = path.join(tempDir, 'dist', '*.bin');
+    process.env.INPUT_SIGNATURES = SIGNATURES;
+    await assert.rejects(run({now: NOW}), /signatures can only be set for a single file, but file matched 2/);
+    assert.equal(tokenRequests, 0);
+  });
+
+  test('a signature rejection prints why each signature was refused', async () => {
+    process.env.INPUT_SIGNATURES = SIGNATURES;
+    respond = () => [422, {
+      error: {code: 'SIGNATURE_REJECTED', message: 'signature rejected'},
+      signatures: [{index: 0, keyId: 'sha256:2c26', reason: 'BAD_SIGNATURE', message: 'signature does not verify over the file'}],
+    }];
+    await assert.rejects(run({now: NOW}), (error) => {
+      assert.equal(error.message, [
+        'Resource upload of artifact.txt failed with HTTP 422: signature rejected (SIGNATURE_REJECTED), refused 1 signature(s):',
+        '  signatures[0] sha256:2c26: BAD_SIGNATURE: signature does not verify over the file',
+      ].join('\n'));
+      return true;
+    });
+    assert.equal(uploads.length, 1);
   });
 
   test('a SHA-256 mismatch fails the step but still reports the stored resource', async () => {
